@@ -3,6 +3,7 @@ import {
   listarExpedientes, 
   obtenerExpediente, 
   crearExpediente, 
+  actualizarExpediente,
   cambiarEstadoExpediente,
   marcarObservacionesVistas,
   eliminarExpediente,
@@ -47,12 +48,11 @@ router.post('/', autenticar, crearExpediente);
 
 /**
  * PUT /expedientes/:id
- * Actualizar un expediente (solo PENDIENTE)
- * - ASESOR: Solo puede editar sus propias propiedades PENDIENTES
- * - ADMIN/REVISOR: Pueden editar cualquier propiedad PENDIENTE
- * TODO: Implementar función actualizarExpediente
+ * Actualizar un expediente (EN_PREPARACION o PENDIENTE)
+ * - ASESOR: Solo puede editar sus propias propiedades EN_PREPARACION o PENDIENTES
+ * - ADMIN/REVISOR: Pueden editar cualquier propiedad EN_PREPARACION o PENDIENTE
  */
-// router.put('/:id', autenticar, actualizarExpediente);
+router.put('/:id', autenticar, actualizarExpediente);
 
 /**
  * PUT /expedientes/:id/estado

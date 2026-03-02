@@ -837,3 +837,138 @@ export const obtenerHistorial = async (req: Request, res: Response) => {
     res.status(500).json({ error: 'Error interno del servidor' });
   }
 };
+
+/**
+ * PUT /expedientes/:id
+ * Actualiza los datos de un expediente
+ *
+ * Permisos:
+ * - ASESOR: Solo puede editar sus propias propiedades en estado EN_PREPARACION o PENDIENTE
+ * - ADMIN/REVISOR: Pueden editar cualquier propiedad PENDIENTE
+ */
+export const actualizarExpediente = async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const expedienteId = parseInt(id);
+    const usuario = req.usuario;
+
+    if (isNaN(expedienteId)) {
+      res.status(400).json({ error: 'ID de expediente inválido' });
+      return;
+    }
+
+    if (!usuario) {
+      res.status(401).json({ error: 'Usuario no autenticado' });
+      return;
+    }
+
+    // Buscar el expediente existente
+    const expedienteExistente = await prisma.expediente.findUnique({
+      where: { id: expedienteId }
+    });
+
+    if (!expedienteExistente) {
+      res.status(404).json({ error: 'Expediente no encontrado' });
+      return;
+    }
+
+    // Verificar permisos:
+    // ASESOR: solo sus propias propiedades EN_PREPARACION o PENDIENTE
+    if (usuario.rol === 'ASESOR') {
+      if (expedienteExistente.asesorId !== usuario.id) {
+        res.status(403).json({ error: 'No tienes permiso para editar esta propiedad' });
+        return;
+      }
+      if (expedienteExistente.estado !== 'EN_PREPARACION' && expedienteExistente.estado !== 'PENDIENTE') {
+        res.status(400).json({ error: 'Solo puedes editar propiedades en preparación o pendientes' });
+        return;
+      }
+    }
+
+    // ADMIN/REVISOR: solo propiedades PENDIENTE (no APROBADO ni RECHAZADO)
+    if (usuario.rol === 'ADMIN' || usuario.rol === 'REVISOR') {
+      if (expedienteExistente.estado !== 'EN_PREPARACION' && expedienteExistente.estado !== 'PENDIENTE') {
+        res.status(400).json({ error: 'No se pueden editar propiedades aprobadas o rechazadas' });
+        return;
+      }
+    }
+
+    const {
+      titulo,
+      tipoPropiedad,
+      descripcion,
+      direccion,
+      partidaInmobiliaria,
+      localidad,
+      emails,
+      propietarios
+    } = req.body;
+
+    // Validar título si viene
+    if (titulo !== undefined && (!titulo || titulo.trim() === '')) {
+      res.status(400).json({ error: 'El campo "titulo" no puede estar vacío' });
+      return;
+    }
+
+    // Validar tipoPropiedad si viene
+    if (tipoPropiedad !== undefined && (!tipoPropiedad || tipoPropiedad.trim() === '')) {
+      res.status(400).json({ error: 'El campo "tipoPropiedad" no puede estar vacío' });
+      return;
+    }
+
+    // Auto-actualizar propietarioNombre desde el array de propietarios
+    let propietarioNombreAuto = expedienteExistente.propietarioNombre;
+    if (propietarios && Array.isArray(propietarios) && propietarios.length > 0) {
+      const nombres = propietarios
+        .map((p: any) => p.nombreCompleto)
+        .filter((nombre: string) => nombre && nombre.trim())
+        .join(', ');
+      if (nombres) {
+        propietarioNombreAuto = nombres;
+      }
+    }
+
+    // Construir object de actualización
+    const datosActualizacion: any = {};
+    if (titulo !== undefined) datosActualizacion.titulo = titulo.trim();
+    if (tipoPropiedad !== undefined) datosActualizacion.tipoPropiedad = tipoPropiedad.trim();
+    if (descripcion !== undefined) datosActualizacion.descripcion = descripcion?.trim() || null;
+    if (direccion !== undefined) datosActualizacion.direccion = direccion?.trim() || null;
+    if (partidaInmobiliaria !== undefined) datosActualizacion.partidaInmobiliaria = partidaInmobiliaria?.trim() || null;
+    if (localidad !== undefined) datosActualizacion.localidad = localidad?.trim() || null;
+    if (emails !== undefined) datosActualizacion.emails = emails?.trim() || null;
+    if (propietarios !== undefined) {
+      datosActualizacion.propietarios = propietarios ? JSON.stringify(propietarios) : null;
+      datosActualizacion.propietarioNombre = propietarioNombreAuto;
+    }
+
+    const expedienteActualizado = await prisma.expediente.update({
+      where: { id: expedienteId },
+      data: datosActualizacion,
+      include: {
+        asesor: {
+          select: { id: true, nombre: true, email: true, rol: true }
+        }
+      }
+    });
+
+    // Registrar en historial
+    await prisma.historialCambio.create({
+      data: {
+        expedienteId,
+        usuarioId: usuario.id,
+        accion: 'EDICION',
+        detalle: `Editó los datos de la propiedad "${expedienteActualizado.titulo}"`,
+        estadoNuevo: expedienteActualizado.estado
+      }
+    });
+
+    res.json({
+      mensaje: 'Expediente actualizado exitosamente',
+      expediente: expedienteActualizado
+    });
+  } catch (error) {
+    console.error('Error al actualizar expediente:', error instanceof Error ? error.message : 'Unknown error');
+    res.status(500).json({ error: 'Error interno del servidor al actualizar el expediente' });
+  }
+};

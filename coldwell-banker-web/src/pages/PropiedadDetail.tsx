@@ -200,7 +200,7 @@ const PropiedadDetail = () => {
       await descargarDocumento(docId, rutaArchivo);
       
       // Marcar como visto
-      await api.post(`/documentos/${docId}/marcar-visto`);
+      await api.post(`/expedientes/documentos/${docId}/marcar-visto`);
       
       // Refrescar propiedad para mostrar el tilde verde
       await fetchPropiedad();
