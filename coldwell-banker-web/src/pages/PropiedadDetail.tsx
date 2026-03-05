@@ -176,19 +176,15 @@ const PropiedadDetail = () => {
         responseType: 'blob'
       });
 
-      const url = window.URL.createObjectURL(new Blob([response.data]));
-      const link = document.createElement('a');
-      link.href = url;
+      // Crear blob URL con tipo PDF y abrir en nueva pestaña
+      const blob = new Blob([response.data], { type: 'application/pdf' });
+      const url = window.URL.createObjectURL(blob);
+      window.open(url, '_blank');
       
-      const filename = rutaArchivo.split('/').pop() || `documento-${docId}.pdf`;
-      link.setAttribute('download', filename);
-      
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-      window.URL.revokeObjectURL(url);
+      // Liberar la URL después de un tiempo para que la pestaña cargue
+      setTimeout(() => window.URL.revokeObjectURL(url), 10000);
     } catch (err) {
-      console.error('Error al descargar documento:', err);
+      console.error('Error al abrir documento:', err);
       throw err;
     }
   };
@@ -643,9 +639,9 @@ const PropiedadDetail = () => {
                                 <button
                                   onClick={() => handleDocumentoClick(doc.id, doc.rutaArchivo)}
                                   className={yaVisto ? styles.downloadButtonVisto : styles.downloadButton}
-                                  title={yaVisto ? "Volver a descargar" : "Descargar documento"}
+                                  title={yaVisto ? "Volver a ver" : "Ver documento"}
                                 >
-                                  📥 Descargar
+                                  📄 Ver
                                 </button>
                               </div>
                             </td>
