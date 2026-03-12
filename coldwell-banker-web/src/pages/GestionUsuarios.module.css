@@ -143,6 +143,41 @@
   transform: scale(1.05);
 }
 
+/* Columna contraseña inline */
+.passwordCell {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.passwordValue {
+  font-family: 'Courier New', monospace;
+  font-size: 0.875rem;
+  color: #86efac;
+  letter-spacing: 0.5px;
+}
+
+.noPassword {
+  font-size: 0.8rem;
+  color: rgba(255, 255, 255, 0.35);
+  font-style: italic;
+}
+
+.btnTogglePass {
+  background: transparent;
+  border: none;
+  color: rgba(255, 255, 255, 0.4);
+  cursor: pointer;
+  padding: 2px;
+  display: flex;
+  align-items: center;
+  transition: color 0.2s ease;
+}
+
+.btnTogglePass:hover {
+  color: rgba(255, 255, 255, 0.8);
+}
+
 .passwordDisplay {
   margin: 1.5rem 0;
 }

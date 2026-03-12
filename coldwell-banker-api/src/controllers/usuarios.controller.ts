@@ -76,6 +76,7 @@ export const obtenerUsuarios = async (req: Request, res: Response) => {
         nombre: true,
         email: true,
         rol: true,
+        password: true, // ⚠️ Password en texto plano, solo para ADMIN
         createdAt: true
         // NO devolvemos el hash
       },
@@ -113,12 +114,25 @@ export const eliminarUsuario = async (req: Request, res: Response) => {
 
     // Verificar que el usuario existe
     const usuario = await prisma.usuario.findUnique({
-      where: { id: userId }
+      where: { id: userId },
+      include: {
+        _count: {
+          select: { expedientes: true }
+        }
+      }
     });
 
     if (!usuario) {
       res.status(404).json({ 
         error: 'Usuario no encontrado' 
+      });
+      return;
+    }
+
+    // No permitir eliminar si tiene expedientes asignados
+    if (usuario._count.expedientes > 0) {
+      res.status(409).json({ 
+        error: `No se puede eliminar al usuario porque tiene ${usuario._count.expedientes} expediente(s) asignado(s). Reasigná los expedientes primero.`
       });
       return;
     }

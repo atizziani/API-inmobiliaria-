@@ -170,7 +170,7 @@ const PropiedadDetail = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [location.state]);
 
-  const descargarDocumento = async (docId: number, rutaArchivo: string) => {
+  const descargarDocumento = async (docId: number) => {
     try {
       const response = await api.get(`/documentos/${docId}/download`, {
         responseType: 'blob'
@@ -190,10 +190,10 @@ const PropiedadDetail = () => {
   };
 
   // 🆕 Handler para descargar y marcar como visto
-  const handleDocumentoClick = async (docId: number, rutaArchivo: string) => {
+  const handleDocumentoClick = async (docId: number) => {
     try {
       // Descargar documento
-      await descargarDocumento(docId, rutaArchivo);
+      await descargarDocumento(docId);
       
       // Marcar como visto
       await api.post(`/expedientes/documentos/${docId}/marcar-visto`);
@@ -637,7 +637,7 @@ const PropiedadDetail = () => {
                                   </span>
                                 )}
                                 <button
-                                  onClick={() => handleDocumentoClick(doc.id, doc.rutaArchivo)}
+                                  onClick={() => handleDocumentoClick(doc.id)}
                                   className={yaVisto ? styles.downloadButtonVisto : styles.downloadButton}
                                   title={yaVisto ? "Volver a ver" : "Ver documento"}
                                 >

@@ -10,6 +10,7 @@ interface Usuario {
   email: string;
   rol: 'ADMIN' | 'REVISOR' | 'ASESOR';
   createdAt: string;
+  password?: string | null;
 }
 
 const GestionUsuarios = () => {
@@ -20,6 +21,11 @@ const GestionUsuarios = () => {
   const [usuarioAEliminar, setUsuarioAEliminar] = useState<Usuario | null>(null);
   const [confirmText, setConfirmText] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const [visiblePasswords, setVisiblePasswords] = useState<Record<number, boolean>>({});
+  
+  const togglePasswordVisible = (userId: number) => {
+    setVisiblePasswords(prev => ({ ...prev, [userId]: !prev[userId] }));
+  };
   
   // Estados para cambio de contraseña
   const [showPasswordModal, setShowPasswordModal] = useState(false);
@@ -118,18 +124,6 @@ const GestionUsuarios = () => {
     setTimeout(() => setCopied(false), 2000);
   };
 
-  const verPassword = async (usuario: Usuario) => {
-    setError('');
-    try {
-      const res = await api.get(`/usuarios/${usuario.id}/password`);
-      setPasswordGenerada(res.data.password);
-      setUsuarioACambiarPassword(usuario);
-      setShowPasswordSuccessModal(true);
-    } catch (err: any) {
-      setError(err.response?.data?.error || 'Error al obtener contraseña');
-      setTimeout(() => setError(''), 5000);
-    }
-  };
 
   const confirmarEliminacion = async () => {
     if (!usuarioAEliminar) return;
@@ -289,6 +283,7 @@ const GestionUsuarios = () => {
               <th>NOMBRE</th>
               <th>EMAIL</th>
               <th>ROL</th>
+              <th>CONTRASEÑA</th>
               <th>FECHA DE CREACIÓN</th>
               <th>ACCIONES</th>
             </tr>
@@ -304,6 +299,26 @@ const GestionUsuarios = () => {
                     <span>{getRolLabel(usuario.rol)}</span>
                   </div>
                 </td>
+                <td>
+                  <div className={styles.passwordCell}>
+                    {usuario.password ? (
+                      <>
+                        <span className={styles.passwordValue}>
+                          {visiblePasswords[usuario.id] ? usuario.password : '••••••••'}
+                        </span>
+                        <button
+                          className={styles.btnTogglePass}
+                          onClick={() => togglePasswordVisible(usuario.id)}
+                          title={visiblePasswords[usuario.id] ? 'Ocultar' : 'Mostrar'}
+                        >
+                          {visiblePasswords[usuario.id] ? <EyeOff size={15} /> : <Eye size={15} />}
+                        </button>
+                      </>
+                    ) : (
+                      <span className={styles.noPassword}>No disponible</span>
+                    )}
+                  </div>
+                </td>
                 <td>{new Date(usuario.createdAt).toLocaleDateString('es-AR')}</td>
                 <td>
                   <div className={styles.actionButtons}>
@@ -313,13 +328,6 @@ const GestionUsuarios = () => {
                       title="Cambiar contraseña"
                     >
                       <Key size={18} />
-                    </button>
-                    <button
-                      className={styles.btnViewPassword}
-                      onClick={() => verPassword(usuario)}
-                      title="Ver contraseña"
-                    >
-                      <Eye size={18} />
                     </button>
                     <button
                       className={styles.btnDelete}
