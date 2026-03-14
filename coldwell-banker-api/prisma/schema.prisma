@@ -168,7 +168,7 @@ model ObjetivoConfiguracion {
   createdAt       DateTime      @default(now())
   updatedAt       DateTime      @updatedAt
 
-  asesor Usuario @relation("AsesorObjetivosConfiguracion", fields: [asesorId], references: [id])
+  asesor Usuario @relation("AsesorObjetivosConfiguracion", fields: [asesorId], references: [id], onDelete: Cascade)
 
   @@unique([asesorId, tipoActividad, año])
   @@map("objetivo_configuracion") // Mantener nombre de tabla en DB por compatibilidad
@@ -193,8 +193,8 @@ model HistorialCambio {
   id             Int        @id @default(autoincrement())
   expediente     Expediente @relation(fields: [expedienteId], references: [id], onDelete: Cascade)
   expedienteId   Int
-  usuario        Usuario    @relation(fields: [usuarioId], references: [id])
-  usuarioId      Int
+  usuario        Usuario?   @relation(fields: [usuarioId], references: [id], onDelete: SetNull)
+  usuarioId      Int?       // Nullable: si el usuario es eliminado, se conserva el historial
   accion         String     // CREACION, CAMBIO_ESTADO, EDICION, DOCUMENTO_SUBIDO, ENVIO_REVISION
   detalle        String?    // Descripción legible, ej: "Cambió estado de PENDIENTE a APROBADO"
   estadoAnterior String?    // Estado antes del cambio (si aplica)
