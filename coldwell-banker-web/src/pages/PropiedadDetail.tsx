@@ -89,13 +89,11 @@ const PropiedadDetail = () => {
   const canChangeStatus = user?.rol === 'ADMIN' || user?.rol === 'REVISOR';
 
   // Verificar si el usuario puede editar la propiedad
-  // Asesores pueden editar EN_PREPARACION y PENDIENTE (si es suya)
-  // ADMIN/REVISOR pueden editar PENDIENTE
+  // Asesores pueden editar EN_PREPARACION, PENDIENTE y RECHAZADO (si es suya)
+  // ADMIN/REVISOR pueden editar PENDIENTE o EN_PREPARACION
   const canEditProperty = 
-    ((propiedad?.estado === 'EN_PREPARACION' || propiedad?.estado === 'PENDIENTE') &&
-     (user?.rol === 'ADMIN' || 
-      user?.rol === 'REVISOR' || 
-      (user?.rol === 'ASESOR' && propiedad?.asesor?.id === user?.id)));
+    ((propiedad?.estado === 'EN_PREPARACION' || propiedad?.estado === 'PENDIENTE') && (user?.rol === 'ADMIN' || user?.rol === 'REVISOR')) ||
+    ((propiedad?.estado === 'EN_PREPARACION' || propiedad?.estado === 'PENDIENTE' || propiedad?.estado === 'RECHAZADO') && (user?.rol === 'ASESOR' && propiedad?.asesor?.id === user?.id));
 
   const canDownloadMandato = 
     propiedad?.mandato &&
@@ -357,8 +355,8 @@ const PropiedadDetail = () => {
             </button>
           )}
 
-          {/* Botón ENVIAR A REVISIÓN (EN_PREPARACION: asesor dueño o ADMIN) */}
-          {propiedad.estado === 'EN_PREPARACION' && 
+          {/* Botón ENVIAR A REVISIÓN (EN_PREPARACION o RECHAZADO: asesor dueño o ADMIN) */}
+          {(propiedad.estado === 'EN_PREPARACION' || propiedad.estado === 'RECHAZADO') && 
            (propiedad.asesor.id === user?.id || user?.rol === 'ADMIN') && (
             <button 
               onClick={handleEnviarRevision} 

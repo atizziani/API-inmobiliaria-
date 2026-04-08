@@ -7,7 +7,7 @@ generator client {
 // Base de datos PostgreSQL para Railway
 // En local podés seguir usando SQLite cambiando el provider temporalmente
 datasource db {
-  provider = "postgresql"
+  provider = "sqlite"
   url      = env("DATABASE_URL")
 }
 

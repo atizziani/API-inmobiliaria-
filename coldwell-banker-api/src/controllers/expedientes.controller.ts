@@ -702,10 +702,10 @@ export const enviarARevision = async (req: Request, res: Response) => {
       return;
     }
 
-    // Solo se puede enviar si está EN_PREPARACION
-    if (expediente.estado !== 'EN_PREPARACION') {
+    // Solo se puede enviar si está EN_PREPARACION o RECHAZADO
+    if (expediente.estado !== 'EN_PREPARACION' && expediente.estado !== 'RECHAZADO') {
       res.status(400).json({ 
-        error: 'Solo se pueden enviar propiedades que están en preparación' 
+        error: 'Solo se pueden enviar propiedades que están en preparación o rechazadas' 
       });
       return;
     }
@@ -738,7 +738,7 @@ export const enviarARevision = async (req: Request, res: Response) => {
             usuarioId: userId!,
             accion: 'ENVIO_REVISION',
             detalle: 'Envió la propiedad a revisión',
-            estadoAnterior: 'EN_PREPARACION',
+            estadoAnterior: expediente.estado,
             estadoNuevo: 'PENDIENTE'
         }
     });
@@ -873,14 +873,14 @@ export const actualizarExpediente = async (req: Request, res: Response) => {
     }
 
     // Verificar permisos:
-    // ASESOR: solo sus propias propiedades EN_PREPARACION o PENDIENTE
+    // ASESOR: solo sus propias propiedades EN_PREPARACION, PENDIENTE o RECHAZADO
     if (usuario.rol === 'ASESOR') {
       if (expedienteExistente.asesorId !== usuario.id) {
         res.status(403).json({ error: 'No tienes permiso para editar esta propiedad' });
         return;
       }
-      if (expedienteExistente.estado !== 'EN_PREPARACION' && expedienteExistente.estado !== 'PENDIENTE') {
-        res.status(400).json({ error: 'Solo puedes editar propiedades en preparación o pendientes' });
+      if (expedienteExistente.estado !== 'EN_PREPARACION' && expedienteExistente.estado !== 'PENDIENTE' && expedienteExistente.estado !== 'RECHAZADO') {
+        res.status(400).json({ error: 'Solo puedes editar propiedades en preparación, pendientes o rechazadas' });
         return;
       }
     }
