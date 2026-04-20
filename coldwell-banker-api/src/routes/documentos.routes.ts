@@ -2,7 +2,8 @@ import { Router } from 'express';
 import {
   listarDocumentosPorExpediente,
   crearDocumento,
-  eliminarDocumento
+  eliminarDocumento,
+  actualizarDocumento
 } from '../controllers/documentos.controller';
 import { autenticar, esAdmin } from '../middlewares/auth.middleware';
 import { uploadSinglePDF } from '../config/multer.config';
@@ -65,11 +66,35 @@ router.post('/',
 );
 
 /**
+ * PUT /documentos/:id
+ * Actualiza un documento (reemplazar archivo o editar metadatos)
+ * Requiere autenticación
+ */
+router.put('/:id',
+  autenticar,
+  (req, res, next) => {
+    const contentType = req.headers['content-type'] || '';
+    if (contentType.includes('multipart/form-data')) {
+      uploadSinglePDF(req, res, (err) => {
+        if (err) {
+          res.status(400).json({ error: err.message || 'Error al procesar el archivo' });
+          return;
+        }
+        next();
+      });
+    } else {
+      next();
+    }
+  },
+  actualizarDocumento
+);
+
+/**
  * DELETE /documentos/:id
  * Elimina un documento
- * Requiere autenticación y rol ADMIN
+ * Requiere autenticación (el controller valida si es el dueño o admin)
  */
-router.delete('/:id', autenticar, esAdmin, eliminarDocumento);
+router.delete('/:id', autenticar, eliminarDocumento);
 
 import { descargarDocumento } from '../controllers/download.controller';
 // ... (rutas existentes) ...

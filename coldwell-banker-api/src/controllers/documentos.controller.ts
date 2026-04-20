@@ -300,34 +300,55 @@ export const crearDocumento = async (req: Request, res: Response) => {
 
 /**
  * DELETE /documentos/:id
- * Elimina un documento (solo ADMIN)
+ * Elimina un documento (ADMIN o DUEÑO de la propiedad)
  */
 export const eliminarDocumento = async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
     const docId = parseInt(id);
 
-    // Validar que el ID sea un número válido
     if (isNaN(docId)) {
-      res.status(400).json({
-        error: 'ID de documento inválido'
-      });
+      res.status(400).json({ error: 'ID de documento inválido' });
       return;
     }
 
-    // Verificar que el documento existe
-    const documentoExistente = await prisma.documento.findUnique({
-      where: { id: docId }
+    // Buscar documento junto con el expediente para validar permisos
+    const documento = await prisma.documento.findUnique({
+      where: { id: docId },
+      include: {
+        expediente: {
+          select: { asesorId: true }
+        }
+      }
     });
 
-    if (!documentoExistente) {
-      res.status(404).json({
-        error: 'Documento no encontrado'
-      });
+    if (!documento) {
+      res.status(404).json({ error: 'Documento no encontrado' });
       return;
     }
 
-    // Eliminar el documento
+    // Validar permisos: ADMIN o asesor dueño
+    const esAdmin = req.usuario?.rol === 'ADMIN';
+    const esDuenio = req.usuario?.id === documento.expediente.asesorId;
+
+    if (!esAdmin && !esDuenio) {
+      res.status(403).json({ error: 'No tenés permisos para eliminar este documento' });
+      return;
+    }
+
+    // Intentar eliminar el archivo físico
+    try {
+      const filePath = path.join(process.cwd(), documento.rutaArchivo);
+      if (fs.existsSync(filePath)) {
+        fs.unlinkSync(filePath);
+        console.log(`✅ Archivo eliminado: ${filePath}`);
+      }
+    } catch (err) {
+      console.error('⚠️ Error al eliminar archivo físico:', err);
+      // Continuamos con la eliminación en DB aunque falle el físico
+    }
+
+    // Eliminar de la base de datos
     await prisma.documento.delete({
       where: { id: docId }
     });
@@ -336,10 +357,124 @@ export const eliminarDocumento = async (req: Request, res: Response) => {
       mensaje: 'Documento eliminado exitosamente',
       documentoId: docId
     });
+
+    // Registrar en historial
+    try {
+      await prisma.historialCambio.create({
+        data: {
+          expedienteId: documento.expedienteId,
+          usuarioId: req.usuario!.id,
+          accion: 'DOCUMENTO_ELIMINADO',
+          detalle: `Eliminó documento ${documento.tipo}: ${documento.nombre || 'sin nombre'}`
+        }
+      });
+    } catch (e) { /* No bloquear */ }
+
   } catch (error) {
     console.error('Error al eliminar documento:', error);
     res.status(500).json({
       error: 'Error interno del servidor al eliminar el documento'
+    });
+  }
+};
+
+/**
+ * PUT /documentos/:id
+ * Actualiza un documento (reemplazar archivo o metadatos)
+ */
+export const actualizarDocumento = async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const docId = parseInt(id);
+    const { tipo, nombre } = req.body;
+    const esArchivoSubido = req.file !== undefined;
+
+    if (isNaN(docId)) {
+      res.status(400).json({ error: 'ID de documento inválido' });
+      return;
+    }
+
+    // Verificar existencia y permisos
+    const documentoExistente = await prisma.documento.findUnique({
+      where: { id: docId },
+      include: {
+        expediente: {
+          select: { asesorId: true }
+        }
+      }
+    });
+
+    if (!documentoExistente) {
+      res.status(404).json({ error: 'Documento no encontrado' });
+      return;
+    }
+
+    const esAdmin = req.usuario?.rol === 'ADMIN';
+    const esDuenio = req.usuario?.id === documentoExistente.expediente.asesorId;
+
+    if (!esAdmin && !esDuenio) {
+      res.status(403).json({ error: 'No tenés permisos para modificar este documento' });
+      return;
+    }
+
+    let rutaArchivo = documentoExistente.rutaArchivo;
+    let nombreArchivo = nombre || documentoExistente.nombre;
+
+    // Si se subió un nuevo archivo, reemplazamos el anterior
+    if (esArchivoSubido) {
+      const archivo = req.file!;
+      
+      // 1. Borrar archivo viejo
+      try {
+        const oldFilePath = path.join(process.cwd(), documentoExistente.rutaArchivo);
+        if (fs.existsSync(oldFilePath)) {
+          fs.unlinkSync(oldFilePath);
+        }
+      } catch (err) {
+        console.error('⚠️ Error al eliminar archivo viejo durante reemplazo:', err);
+      }
+
+      // 2. Procesar nueva ruta
+      const rutaAbsoluta = archivo.path.replace(/\\/g, '/');
+      const rutaRelativa = rutaAbsoluta.split('/uploads/')[1];
+      rutaArchivo = `uploads/${rutaRelativa}`;
+      
+      if (!nombre) {
+        nombreArchivo = archivo.originalname;
+      }
+    }
+
+    // Actualizar en DB
+    const documentoActualizado = await prisma.documento.update({
+      where: { id: docId },
+      data: {
+        tipo: tipo || documentoExistente.tipo,
+        nombre: nombreArchivo,
+        rutaArchivo: rutaArchivo
+      }
+    });
+
+    res.json({
+      mensaje: 'Documento actualizado exitosamente',
+      documento: documentoActualizado
+    });
+
+    // Registrar en historial
+    try {
+      await prisma.historialCambio.create({
+        data: {
+          expedienteId: documentoExistente.expedienteId,
+          usuarioId: req.usuario!.id,
+          accion: 'DOCUMENTO_ACTUALIZADO',
+          detalle: `Actualizó/Reemplazó documento ${documentoActualizado.tipo}: ${documentoActualizado.nombre}`
+        }
+      });
+    } catch (e) { /* No bloquear */ }
+
+  } catch (error) {
+    console.error('Error al actualizar documento:', error);
+    res.status(500).json({
+      error: 'Error interno del servidor al actualizar el documento'
     });
   }
 };

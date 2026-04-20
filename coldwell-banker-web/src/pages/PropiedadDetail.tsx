@@ -76,9 +76,13 @@ const PropiedadDetail = () => {
   const [downloadError, setDownloadError] = useState('');
   const [downloadingWord, setDownloadingWord] = useState(false);
   const [showModal, setShowModal] = useState(false);
-  const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [enviandoRevision, setEnviandoRevision] = useState(false);
+  
+  // 🆕 Estados para gestión de documentos
+  const [deletingDocId, setDeletingDocId] = useState<number | null>(null);
+  const [replacingDocId, setReplacingDocId] = useState<number | null>(null);
+  const [processingDocId, setProcessingDocId] = useState<number | null>(null);
   
   const [propietariosList, setPropietariosList] = useState<PropietarioDetalle[]>([]);
 
@@ -187,21 +191,56 @@ const PropiedadDetail = () => {
     }
   };
 
-  // 🆕 Handler para descargar y marcar como visto
-  const handleDocumentoClick = async (docId: number) => {
+  // 🆕 Handler para eliminar documento
+  const handleDeleteDocumento = async (docId: number) => {
+    if (!window.confirm('¿Estás seguro de que quieres eliminar este documento? Esta acción no se puede deshacer.')) {
+      return;
+    }
+
     try {
-      // Descargar documento
-      await descargarDocumento(docId);
+      setProcessingDocId(docId);
+      await api.delete(`/documentos/${docId}`);
       
-      // Marcar como visto
-      await api.post(`/expedientes/documentos/${docId}/marcar-visto`);
+      setSuccessMessage('✅ Documento eliminado correctamente');
+      setTimeout(() => setSuccessMessage(''), 3000);
       
-      // Refrescar propiedad para mostrar el tilde verde
+      // Refrescar propiedad
       await fetchPropiedad();
     } catch (err: any) {
-      console.error('Error:', err instanceof Error ? err.message : 'Unknown');
-      setError(err?.response?.data?.error || 'Error al procesar el documento');
-      setTimeout(() => setError(''), 3000);
+      console.error('Error al eliminar documento:', err);
+      setError(err?.response?.data?.error || 'Error al eliminar el documento');
+      setTimeout(() => setError(''), 5000);
+    } finally {
+      setProcessingDocId(null);
+    }
+  };
+
+  // 🆕 Handler para reemplazar documento
+  const handleReplaceDocumento = async (docId: number, file: File) => {
+    try {
+      setProcessingDocId(docId);
+      
+      const formData = new FormData();
+      formData.append('archivo', file);
+      
+      await api.put(`/documentos/${docId}`, formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      });
+      
+      setSuccessMessage('✅ Documento reemplazado correctamente');
+      setTimeout(() => setSuccessMessage(''), 3000);
+      
+      // Refrescar propiedad
+      await fetchPropiedad();
+    } catch (err: any) {
+      console.error('Error al reemplazar documento:', err);
+      setError(err?.response?.data?.error || 'Error al reemplazar el documento');
+      setTimeout(() => setError(''), 5000);
+    } finally {
+      setProcessingDocId(null);
+      setReplacingDocId(null);
     }
   };
 
@@ -634,13 +673,51 @@ const PropiedadDetail = () => {
                                     ✅
                                   </span>
                                 )}
+                                
                                 <button
                                   onClick={() => handleDocumentoClick(doc.id)}
                                   className={yaVisto ? styles.downloadButtonVisto : styles.downloadButton}
                                   title={yaVisto ? "Volver a ver" : "Ver documento"}
+                                  disabled={processingDocId === doc.id}
                                 >
                                   📄 Ver
                                 </button>
+
+                                {canEditProperty && (
+                                  <>
+                                    <button
+                                      onClick={() => {
+                                        setReplacingDocId(doc.id);
+                                        document.getElementById(`replace-input-${doc.id}`)?.click();
+                                      }}
+                                      className={styles.replaceButton}
+                                      title="Reemplazar archivo"
+                                      disabled={processingDocId === doc.id}
+                                    >
+                                      {processingDocId === doc.id && replacingDocId === doc.id ? '⏳' : '🔄'} Reemplazar
+                                    </button>
+                                    
+                                    <input
+                                      id={`replace-input-${doc.id}`}
+                                      type="file"
+                                      style={{ display: 'none' }}
+                                      accept=".pdf,application/pdf"
+                                      onChange={(e) => {
+                                        const file = e.target.files?.[0];
+                                        if (file) handleReplaceDocumento(doc.id, file);
+                                      }}
+                                    />
+
+                                    <button
+                                      onClick={() => handleDeleteDocumento(doc.id)}
+                                      className={styles.deleteDocButton}
+                                      title="Eliminar documento"
+                                      disabled={processingDocId === doc.id}
+                                    >
+                                      {processingDocId === doc.id && !replacingDocId ? '⏳' : '🗑️'} Eliminar
+                                    </button>
+                                  </>
+                                )}
                               </div>
                             </td>
                           </tr>
